@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>meow-ssh - Terminal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'system-ui', 'sans-serif'],
+            mono: ['SF Mono', 'Fira Code', 'JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/css/xterm.min.css">
+  <style>
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes spin-slow { to { transform: rotate(360deg); } }
+    .fade-in { animation: fade-in 0.3s ease-out both; }
+    .spin-slow { animation: spin-slow 1s linear infinite; }
+    #terminal-container { display: none; width: 100%; height: 100vh; position: relative; }
+    #terminal-container .xterm { padding: 8px; height: 100%; }
+    .xterm-viewport::-webkit-scrollbar { width: 8px; }
+    .xterm-viewport::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+    #theme-toggle {
+      position: fixed; top: 10px; right: 10px; z-index: 50;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 5px 10px; color: #a1a1aa; font-size: 12px;
+      font-family: 'SF Mono', 'Fira Code', monospace; cursor: pointer;
+      backdrop-filter: blur(8px); transition: all 0.2s;
+    }
+    #theme-toggle:hover { background: rgba(255,255,255,0.1); color: #e4e4e7; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-sans m-0 overflow-hidden">
+
+  <!-- Auth screen -->
+  <div id="auth-screen" class="min-h-screen flex items-center justify-center px-4 fade-in">
+    <div class="w-full max-w-sm">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 sm:p-10 shadow-2xl shadow-black/20">
+        <div class="text-center mb-8">
+          <pre class="font-mono text-cyan-400/40 text-sm leading-snug select-none inline-block text-left">  /\_/\
+ ( <span class="text-yellow-400">o</span>.<span class="text-yellow-400">o</span> )
+  > <span class="text-pink-400">^</span> <</pre>
+          <h1 class="text-2xl font-bold text-white mt-3" style="background: linear-gradient(to right, #22d3ee, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">meow-ssh</h1>
+          <p class="text-zinc-500 text-sm mt-1">Browser terminal</p>
+        </div>
+        <div class="h-px bg-zinc-800 mb-8"></div>
+        <button
+          class="w-full flex items-center justify-center gap-2.5 bg-white hover:bg-zinc-100 text-zinc-900 font-semibold rounded-xl px-6 py-3.5 text-[15px] transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed active:scale-[0.98]"
+          id="authBtn"
+          onclick="startAuth()"
+        >
+          <svg class="w-5 h-5" id="btnIcon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"/>
+          </svg>
+          <svg class="w-5 h-5 spin-slow hidden" id="btnSpinner" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          <span id="btnText">Open Terminal</span>
+        </button>
+        <div class="mt-5 text-center min-h-[24px]">
+          <p class="text-sm" id="status"></p>
+        </div>
+      </div>
+      <p class="text-center text-zinc-700 text-xs mt-6">
+        Authenticate with Touch ID or Face ID to start a shell session.
+      </p>
+    </div>
+  </div>
+
+  <!-- Terminal screen -->
+  <div id="terminal-container">
+    <button id="theme-toggle" onclick="cycleTheme()" style="display:none;" title="Switch theme"></button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0/lib/addon-fit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-webgl@0/lib/addon-webgl.min.js"></script>
+  <script>
+    function bufferToBase64url(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let str = '';
+      for (const b of bytes) str += String.fromCharCode(b);
+      return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    function base64urlToBuffer(base64url) {
+      const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = base64.length % 4;
+      const padded = pad ? base64 + '===='.slice(pad) : base64;
+      const binary = atob(padded);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes.buffer;
+    }
+
+    function setStatus(text, type) {
+      const el = document.getElementById('status');
+      el.textContent = text;
+      el.className = 'text-sm ' + ({ info: 'text-zinc-500', error: 'text-red-400', success: 'text-cyan-400' }[type] || 'text-zinc-500');
+    }
+
+    function setLoading(on) {
+      document.getElementById('authBtn').disabled = on;
+      document.getElementById('btnIcon').classList.toggle('hidden', on);
+      document.getElementById('btnSpinner').classList.toggle('hidden', !on);
+    }
+
+    async function startAuth() {
+      setLoading(true);
+      setStatus('Starting authentication...', 'info');
+
+      try {
+        // Get auth options + token
+        const optRes = await fetch('/api/terminal/auth/options', { method: 'POST' });
+        if (!optRes.ok) throw new Error((await optRes.json()).error);
+        const res = await optRes.json();
+        const challengeId = res.challengeId;
+        const options = res.options.publicKey;
+
+        options.challenge = base64urlToBuffer(options.challenge);
+        if (options.allowCredentials) {
+          options.allowCredentials = options.allowCredentials.map(c => ({
+            ...c, id: base64urlToBuffer(c.id),
+          }));
+        }
+
+        setStatus('Touch ID / Face ID...', 'info');
+        const credential = await navigator.credentials.get({ publicKey: options });
+
+        setStatus('Verifying...', 'info');
+        const body = {
+          challengeId,
+          credential: {
+            id: credential.id,
+            rawId: bufferToBase64url(credential.rawId),
+            type: credential.type,
+            response: {
+              authenticatorData: bufferToBase64url(credential.response.authenticatorData),
+              clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+              signature: bufferToBase64url(credential.response.signature),
+              userHandle: credential.response.userHandle
+                ? bufferToBase64url(credential.response.userHandle) : undefined,
+            },
+            authenticatorAttachment: credential.authenticatorAttachment,
+            clientExtensionResults: credential.getClientExtensionResults(),
+          },
+        };
+
+        const verifyRes = await fetch('/api/terminal/auth/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const result = await verifyRes.json();
+
+        if (!result.token) throw new Error('Verification failed');
+
+        // Auth success — open terminal
+        openTerminal(result.token);
+      } catch (e) {
+        console.error(e);
+        setStatus(e.message || 'Authentication failed', 'error');
+        setLoading(false);
+      }
+    }
+
+    const themes = {
+      zinc: {
+        label: 'Zinc',
+        background: '#09090b', foreground: '#fafafa', cursor: '#fafafa',
+        selectionBackground: '#3f3f46',
+        black: '#09090b', red: '#ef4444', green: '#22c55e', yellow: '#eab308',
+        blue: '#3b82f6', magenta: '#a855f7', cyan: '#06b6d4', white: '#fafafa',
+        brightBlack: '#52525b', brightRed: '#f87171', brightGreen: '#4ade80',
+        brightYellow: '#facc15', brightBlue: '#60a5fa', brightMagenta: '#c084fc',
+        brightCyan: '#22d3ee', brightWhite: '#ffffff',
+      },
+      catppuccin: {
+        label: 'Catppuccin Mocha',
+        background: '#1e1e2e', foreground: '#cdd6f4', cursor: '#f5e0dc',
+        selectionBackground: '#45475a',
+        black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
+        blue: '#89b4fa', magenta: '#f5c2e7', cyan: '#94e2d5', white: '#bac2de',
+        brightBlack: '#585b70', brightRed: '#f38ba8', brightGreen: '#a6e3a1',
+        brightYellow: '#f9e2af', brightBlue: '#89b4fa', brightMagenta: '#f5c2e7',
+        brightCyan: '#94e2d5', brightWhite: '#a6adc8',
+      },
+      dracula: {
+        label: 'Dracula',
+        background: '#282a36', foreground: '#f8f8f2', cursor: '#f8f8f2',
+        selectionBackground: '#44475a',
+        black: '#21222c', red: '#ff5555', green: '#50fa7b', yellow: '#f1fa8c',
+        blue: '#bd93f9', magenta: '#ff79c6', cyan: '#8be9fd', white: '#f8f8f2',
+        brightBlack: '#6272a4', brightRed: '#ff6e6e', brightGreen: '#69ff94',
+        brightYellow: '#ffffa5', brightBlue: '#d6acff', brightMagenta: '#ff92df',
+        brightCyan: '#a4ffff', brightWhite: '#ffffff',
+      },
+      tokyoNight: {
+        label: 'Tokyo Night',
+        background: '#1a1b26', foreground: '#c0caf5', cursor: '#c0caf5',
+        selectionBackground: '#33467c',
+        black: '#15161e', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68',
+        blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6',
+        brightBlack: '#414868', brightRed: '#f7768e', brightGreen: '#9ece6a',
+        brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7',
+        brightCyan: '#7dcfff', brightWhite: '#c0caf5',
+      },
+      nord: {
+        label: 'Nord',
+        background: '#2e3440', foreground: '#d8dee9', cursor: '#d8dee9',
+        selectionBackground: '#434c5e',
+        black: '#3b4252', red: '#bf616a', green: '#a3be8c', yellow: '#ebcb8b',
+        blue: '#81a1c1', magenta: '#b48ead', cyan: '#88c0d0', white: '#e5e9f0',
+        brightBlack: '#4c566a', brightRed: '#bf616a', brightGreen: '#a3be8c',
+        brightYellow: '#ebcb8b', brightBlue: '#81a1c1', brightMagenta: '#b48ead',
+        brightCyan: '#8be9fd', brightWhite: '#eceff4',
+      },
+      oneDark: {
+        label: 'One Dark',
+        background: '#282c34', foreground: '#abb2bf', cursor: '#528bff',
+        selectionBackground: '#3e4451',
+        black: '#282c34', red: '#e06c75', green: '#98c379', yellow: '#e5c07b',
+        blue: '#61afef', magenta: '#c678dd', cyan: '#56b6c2', white: '#abb2bf',
+        brightBlack: '#5c6370', brightRed: '#e06c75', brightGreen: '#98c379',
+        brightYellow: '#e5c07b', brightBlue: '#61afef', brightMagenta: '#c678dd',
+        brightCyan: '#56b6c2', brightWhite: '#ffffff',
+      },
+    };
+
+    const themeKeys = Object.keys(themes);
+    let currentThemeIdx = themeKeys.indexOf(localStorage.getItem('meow-theme') || 'catppuccin');
+    if (currentThemeIdx === -1) currentThemeIdx = 1;
+
+    let activeTerm = null;
+
+    function getTheme() {
+      const key = themeKeys[currentThemeIdx];
+      return { key, ...themes[key] };
+    }
+
+    function cycleTheme() {
+      currentThemeIdx = (currentThemeIdx + 1) % themeKeys.length;
+      const t = getTheme();
+      localStorage.setItem('meow-theme', t.key);
+      document.getElementById('theme-toggle').textContent = t.label;
+      if (activeTerm) activeTerm.options.theme = t;
+      document.getElementById('terminal-container').style.backgroundColor = t.background;
+    }
+
+    function openTerminal(token) {
+      document.getElementById('auth-screen').style.display = 'none';
+      const container = document.getElementById('terminal-container');
+      container.style.display = 'block';
+
+      const t = getTheme();
+      container.style.backgroundColor = t.background;
+
+      const themeBtn = document.getElementById('theme-toggle');
+      themeBtn.textContent = t.label;
+      themeBtn.style.display = 'block';
+
+      const term = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: "'SF Mono', 'Fira Code', 'JetBrains Mono', monospace",
+        theme: t,
+      });
+      activeTerm = term;
+
+      const fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(fitAddon);
+
+      try {
+        const webglAddon = new WebglAddon.WebglAddon();
+        term.loadAddon(webglAddon);
+      } catch {}
+
+      term.open(container);
+      fitAddon.fit();
+
+      const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${wsProto}//${location.host}/ws/terminal?token=${token}`);
+
+      ws.onopen = () => {
+        // Send initial size
+        const size = JSON.stringify({ cols: term.cols, rows: term.rows });
+        ws.send('\x01' + size);
+      };
+
+      ws.onmessage = (e) => term.write(e.data);
+
+      ws.onclose = () => {
+        term.write('\r\n\x1b[90m--- session ended ---\x1b[0m\r\n');
+      };
+
+      ws.onerror = () => {
+        term.write('\r\n\x1b[31mConnection error\x1b[0m\r\n');
+      };
+
+      term.onData((data) => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(data);
+      });
+
+      term.onResize(({ cols, rows }) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send('\x01' + JSON.stringify({ cols, rows }));
+        }
+      });
+
+      window.addEventListener('resize', () => fitAddon.fit());
+      term.focus();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>meow-ssh - Register Passkey</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'system-ui', 'sans-serif'],
+            mono: ['SF Mono', 'Fira Code', 'JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin-slow {
+      to { transform: rotate(360deg); }
+    }
+    .fade-in { animation: fade-in 0.5s ease-out both; }
+    .spin-slow { animation: spin-slow 1s linear infinite; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-sans min-h-screen flex items-center justify-center px-4">
+
+  <div class="w-full max-w-sm fade-in" id="main">
+    <!-- Card -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 sm:p-10 shadow-2xl shadow-black/20" id="card">
+
+      <!-- Cat + Logo -->
+      <div class="text-center mb-8">
+        <pre class="font-mono text-cyan-400/40 text-sm leading-snug select-none inline-block text-left">  /\_/\
+ ( <span class="text-yellow-400">o</span>.<span class="text-yellow-400">o</span> )
+  > <span class="text-pink-400">^</span> <</pre>
+        <h1 class="text-2xl font-bold text-white mt-3" style="background: linear-gradient(to right, #22d3ee, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">meow-ssh</h1>
+        <p class="text-zinc-500 text-sm mt-1">Register your passkey for SSH access</p>
+      </div>
+
+      <!-- Divider -->
+      <div class="h-px bg-zinc-800 mb-8"></div>
+
+      <!-- Info -->
+      <div class="bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-4 mb-6">
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-zinc-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/>
+          </svg>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            This will create a passkey on your device. Use Touch ID, Face ID, or your device's biometric to authenticate SSH sessions.
+          </p>
+        </div>
+      </div>
+
+      <!-- Register Button -->
+      <button
+        class="w-full relative flex items-center justify-center gap-2.5 bg-white hover:bg-zinc-100 text-zinc-900 font-semibold rounded-xl px-6 py-3.5 text-[15px] transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed active:scale-[0.98]"
+        id="regBtn"
+        onclick="register()"
+      >
+        <svg class="w-5 h-5" id="btnIcon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        <!-- Spinner (hidden by default) -->
+        <svg class="w-5 h-5 spin-slow hidden" id="btnSpinner" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        <span id="btnText">Register Passkey</span>
+      </button>
+
+      <!-- Status -->
+      <div class="mt-5 text-center min-h-[24px]">
+        <p class="text-sm" id="status"></p>
+      </div>
+    </div>
+
+    <!-- Footer hint -->
+    <p class="text-center text-zinc-700 text-xs mt-6">
+      One-time setup. Your passkey syncs via iCloud Keychain.
+    </p>
+  </div>
+
+  <script>
+    function bufferToBase64url(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let str = '';
+      for (const b of bytes) str += String.fromCharCode(b);
+      return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    function base64urlToBuffer(base64url) {
+      const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = base64.length % 4;
+      const padded = pad ? base64 + '===='.slice(pad) : base64;
+      const binary = atob(padded);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes.buffer;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const secret = params.get('secret');
+
+    if (!secret) {
+      document.getElementById('card').innerHTML = `
+        <div class="text-center py-4">
+          <div class="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+            </svg>
+          </div>
+          <h2 class="text-lg font-semibold text-white mb-1">Access Denied</h2>
+          <p class="text-sm text-zinc-500">No registration secret provided.</p>
+        </div>
+      `;
+    }
+
+    function setStatus(text, type) {
+      const status = document.getElementById('status');
+      if (!status) return;
+      status.textContent = text;
+      status.className = 'text-sm ' + ({
+        info: 'text-zinc-500',
+        success: 'text-cyan-400',
+        error: 'text-red-400',
+      }[type] || 'text-zinc-500');
+    }
+
+    function setLoading(loading) {
+      const btn = document.getElementById('regBtn');
+      if (!btn) return;
+      const icon = document.getElementById('btnIcon');
+      const spinner = document.getElementById('btnSpinner');
+      btn.disabled = loading;
+      icon.classList.toggle('hidden', loading);
+      spinner.classList.toggle('hidden', !loading);
+    }
+
+    async function register() {
+      const btn = document.getElementById('regBtn');
+      const btnText = document.getElementById('btnText');
+      setLoading(true);
+      setStatus('Getting registration options...', 'info');
+
+      try {
+        const optRes = await fetch('/api/register/options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret }),
+        });
+        if (!optRes.ok) { const err = await optRes.json(); throw new Error(err.error); }
+        const res = await optRes.json();
+        const challengeId = res.challengeId;
+        const options = res.options.publicKey;
+
+        options.challenge = base64urlToBuffer(options.challenge);
+        options.user.id = base64urlToBuffer(options.user.id);
+        if (options.excludeCredentials) {
+          options.excludeCredentials = options.excludeCredentials.map(c => ({
+            ...c, id: base64urlToBuffer(c.id),
+          }));
+        }
+
+        setStatus('Touch ID / Face ID...', 'info');
+
+        const credential = await navigator.credentials.create({ publicKey: options });
+
+        setStatus('Verifying registration...', 'info');
+
+        const body = {
+          challengeId,
+          credential: {
+            id: credential.id,
+            rawId: bufferToBase64url(credential.rawId),
+            type: credential.type,
+            response: {
+              attestationObject: bufferToBase64url(credential.response.attestationObject),
+              clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+              transports: credential.response.getTransports ? credential.response.getTransports() : [],
+            },
+            authenticatorAttachment: credential.authenticatorAttachment,
+            clientExtensionResults: credential.getClientExtensionResults(),
+          },
+        };
+
+        const verifyRes = await fetch('/api/register/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        const result = await verifyRes.json();
+
+        if (result.success) {
+          setStatus('Passkey registered! You can now SSH with passkey auth.', 'success');
+          btnText.textContent = 'Done';
+          setLoading(false);
+          btn.disabled = true;
+          document.getElementById('btnIcon').innerHTML = '<polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+          document.getElementById('btnIcon').classList.remove('hidden');
+          document.getElementById('btnSpinner').classList.add('hidden');
+        } else {
+          throw new Error(result.error || 'Registration failed');
+        }
+      } catch (e) {
+        console.error(e);
+        setStatus(e.message || 'Registration failed', 'error');
+        setLoading(false);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+target/
+meow.db
+meow.db-wal
+meow.db-shm
+meow_host_key
+meow_host_key.pub
+*.log
+.DS_Store
+CLAUDE.md

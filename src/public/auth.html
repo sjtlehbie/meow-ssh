@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>meow-ssh - Authenticate</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'system-ui', 'sans-serif'],
+            mono: ['SF Mono', 'Fira Code', 'JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.15); }
+      70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+    }
+    @keyframes spin-slow {
+      to { transform: rotate(360deg); }
+    }
+    .fade-in { animation: fade-in 0.5s ease-out both; }
+    .pulse-ring { animation: pulse-ring 2s infinite; }
+    .spin-slow { animation: spin-slow 1s linear infinite; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-sans min-h-screen flex items-center justify-center px-4">
+
+  <div class="w-full max-w-sm fade-in">
+    <!-- Card -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 sm:p-10 shadow-2xl shadow-black/20">
+
+      <!-- Cat + Logo -->
+      <div class="text-center mb-8">
+        <pre class="font-mono text-cyan-400/40 text-sm leading-snug select-none inline-block text-left">  /\_/\
+ ( <span class="text-yellow-400">o</span>.<span class="text-yellow-400">o</span> )
+  > <span class="text-pink-400">^</span> <</pre>
+        <h1 class="text-2xl font-bold text-white mt-3" style="background: linear-gradient(to right, #22d3ee, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">meow-ssh</h1>
+        <p class="text-zinc-500 text-sm mt-1">Verify your identity to continue</p>
+      </div>
+
+      <!-- Divider -->
+      <div class="h-px bg-zinc-800 mb-8"></div>
+
+      <!-- Auth Button -->
+      <button
+        class="w-full relative flex items-center justify-center gap-2.5 bg-white hover:bg-zinc-100 text-zinc-900 font-semibold rounded-xl px-6 py-3.5 text-[15px] transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed active:scale-[0.98]"
+        id="authBtn"
+        onclick="authenticate()"
+      >
+        <svg class="w-5 h-5" id="btnIcon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a48.667 48.667 0 00-1.39 8.284M12 10.5a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/>
+          <path d="M12 10.5c0 2.21-.895 4.21-2.343 5.657"/>
+        </svg>
+        <!-- Spinner (hidden by default) -->
+        <svg class="w-5 h-5 spin-slow hidden" id="btnSpinner" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        <span id="btnText">Verify with Passkey</span>
+      </button>
+
+      <!-- Status -->
+      <div class="mt-5 text-center min-h-[24px]">
+        <p class="text-sm" id="status"></p>
+      </div>
+    </div>
+
+    <!-- Footer hint -->
+    <p class="text-center text-zinc-700 text-xs mt-6">
+      Authenticate with Touch ID or Face ID, then return to your terminal.
+    </p>
+  </div>
+
+  <script>
+    function bufferToBase64url(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let str = '';
+      for (const b of bytes) str += String.fromCharCode(b);
+      return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    function base64urlToBuffer(base64url) {
+      const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = base64.length % 4;
+      const padded = pad ? base64 + '===='.slice(pad) : base64;
+      const binary = atob(padded);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes.buffer;
+    }
+
+    const token = window.location.pathname.split('/auth/')[1];
+
+    function setStatus(text, type) {
+      const status = document.getElementById('status');
+      status.textContent = text;
+      status.className = 'text-sm ' + ({
+        info: 'text-zinc-500',
+        success: 'text-cyan-400',
+        error: 'text-red-400',
+      }[type] || 'text-zinc-500');
+    }
+
+    function setLoading(loading) {
+      const btn = document.getElementById('authBtn');
+      const icon = document.getElementById('btnIcon');
+      const spinner = document.getElementById('btnSpinner');
+      btn.disabled = loading;
+      icon.classList.toggle('hidden', loading);
+      spinner.classList.toggle('hidden', !loading);
+    }
+
+    async function authenticate() {
+      const btn = document.getElementById('authBtn');
+      const btnText = document.getElementById('btnText');
+      setLoading(true);
+      setStatus('Starting authentication...', 'info');
+
+      try {
+        const optRes = await fetch('/api/auth/options/' + token, { method: 'POST' });
+        if (!optRes.ok) { const err = await optRes.json(); throw new Error(err.error); }
+        const res = await optRes.json();
+        const options = res.options.publicKey;
+
+        options.challenge = base64urlToBuffer(options.challenge);
+        if (options.allowCredentials) {
+          options.allowCredentials = options.allowCredentials.map(c => ({
+            ...c, id: base64urlToBuffer(c.id),
+          }));
+        }
+
+        setStatus('Touch ID / Face ID...', 'info');
+
+        const credential = await navigator.credentials.get({ publicKey: options });
+
+        setStatus('Verifying...', 'info');
+
+        const body = {
+          credential: {
+            id: credential.id,
+            rawId: bufferToBase64url(credential.rawId),
+            type: credential.type,
+            response: {
+              authenticatorData: bufferToBase64url(credential.response.authenticatorData),
+              clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+              signature: bufferToBase64url(credential.response.signature),
+              userHandle: credential.response.userHandle
+                ? bufferToBase64url(credential.response.userHandle) : undefined,
+            },
+            authenticatorAttachment: credential.authenticatorAttachment,
+            clientExtensionResults: credential.getClientExtensionResults(),
+          },
+        };
+
+        const verifyRes = await fetch('/api/auth/verify/' + token, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        const result = await verifyRes.json();
+
+        if (result.approved) {
+          setStatus('Authenticated! Return to your terminal.', 'success');
+          btnText.textContent = 'Done';
+          setLoading(false);
+          btn.disabled = true;
+          document.getElementById('btnIcon').innerHTML = '<polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+          document.getElementById('btnIcon').classList.remove('hidden');
+          document.getElementById('btnSpinner').classList.add('hidden');
+        } else {
+          throw new Error('Verification failed');
+        }
+      } catch (e) {
+        console.error(e);
+        setStatus(e.message || 'Authentication failed', 'error');
+        setLoading(false);
+      }
+    }
+
+    authenticate();
+  </script>
+</body>
+</html>
